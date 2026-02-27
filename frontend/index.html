@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Persistence Tasker - Vue.js</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        #app {
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 0.9em;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .input-section {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        .task-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .task-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .add-button {
+            padding: 12px 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .add-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .add-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+        }
+
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .tasks-list {
+            list-style: none;
+        }
+
+        .task-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .task-text {
+            flex: 1;
+            margin-right: 15px;
+            color: #333;
+        }
+
+        .delete-button {
+            padding: 8px 15px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .delete-button:hover {
+            background: #c82333;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            fill: #e0e0e0;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .stats {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            color: #666;
+            font-size: 0.9em;
+        }
+    </style>
+    <!-- Vue.js CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<body>
+    <div id="app">
+        <div class="container">
+            <div class="header">
+                <h1>📝 The Persistence Tasker</h1>
+                <p>Tus tareas se guardan automáticamente en el servidor</p>
+            </div>
+            
+            <div class="content">
+                <!-- Mensaje de error -->
+                <div v-if="error" class="error-message">
+                    {{ error }}
+                </div>
+
+                <!-- Formulario para agregar tareas -->
+                <div class="input-section">
+                    <input 
+                        type="text" 
+                        v-model="newTaskText" 
+                        @keyup.enter="addTask"
+                        placeholder="Escribe una nueva tarea..."
+                        class="task-input"
+                        :disabled="loading"
+                    >
+                    <button 
+                        @click="addTask" 
+                        class="add-button"
+                        :disabled="loading || !newTaskText.trim()"
+                    >
+                        {{ loading ? 'Agregando...' : 'Agregar' }}
+                    </button>
+                </div>
+
+                <!-- Estado de carga -->
+                <div v-if="loading && tasks.length === 0" class="loading">
+                    <div class="loading-spinner"></div>
+                    <p>Cargando tareas...</p>
+                </div>
+
+                <!-- Lista de tareas -->
+                <div v-else>
+                    <ul v-if="tasks.length > 0" class="tasks-list">
+                        <li v-for="task in tasks" :key="task.id" class="task-item">
+                            <span class="task-text">{{ task.text }}</span>
+                            <button 
+                                @click="deleteTask(task.id)" 
+                                class="delete-button"
+                                :disabled="loading"
+                            >
+                                Eliminar
+                            </button>
+                        </li>
+                    </ul>
+
+                    <!-- Estado vacío -->
+                    <div v-else class="empty-state">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
+                        </svg>
+                        <p>No hay tareas pendientes</p>
+                        <p style="font-size: 0.9em; margin-top: 10px;">¡Agrega una nueva tarea!</p>
+                    </div>
+                </div>
+
+                <!-- Estadísticas -->
+                <div class="stats" v-if="tasks.length > 0">
+                    <span>Total de tareas: {{ tasks.length }}</span>
+                    <span>Última actualización: {{ lastUpdate }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted, computed } = Vue;
+
+        createApp({
+            setup() {
+                // Variables reactivas
+                const tasks = ref([]);
+                const newTaskText = ref('');
+                const loading = ref(false);
+                const error = ref(null);
+                const lastUpdate = ref(new Date().toLocaleTimeString());
+
+                // URL base de la API
+                const API_URL = 'http://localhost:3000/api/tasks';
+
+                // Función para manejar errores de fetch
+                async function handleFetch(response) {
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({}));
+                        throw new Error(errorData.error || `Error HTTP: ${response.status}`);
+                    }
+                    return response.json();
+                }
+
+                // Cargar tareas desde el servidor
+                async function loadTasks() {
+                    loading.value = true;
+                    error.value = null;
+                    
+                    try {
+                        console.log('📤 Cargando tareas del servidor...');
+                        const response = await fetch(API_URL);
+                        const data = await handleFetch(response);
+                        tasks.value = data;
+                        lastUpdate.value = new Date().toLocaleTimeString();
+                        console.log('✅ Tareas cargadas:', data);
+                    } catch (err) {
+                        error.value = 'Error al cargar las tareas: ' + err.message;
+                        console.error('❌ Error cargando tareas:', err);
+                    } finally {
+                        loading.value = false;
+                    }
+                }
+
+                // Agregar nueva tarea
+                async function addTask() {
+                    if (!newTaskText.value.trim() || loading.value) return;
+
+                    const taskText = newTaskText.value.trim();
+                    loading.value = true;
+                    error.value = null;
+
+                    try {
+                        console.log('📤 Enviando nueva tarea al servidor...');
+                        const response = await fetch(API_URL, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ text: taskText })
+                        });
+
+                        const newTask = await handleFetch(response);
+                        
+                        // Agregar la nueva tarea a la lista
+                        tasks.value.push(newTask);
+                        
+                        // Limpiar el input
+                        newTaskText.value = '';
+                        
+                        lastUpdate.value = new Date().toLocaleTimeString();
+                        console.log('✅ Tarea agregada:', newTask);
+                    } catch (err) {
+                        error.value = 'Error al agregar la tarea: ' + err.message;
+                        console.error('❌ Error agregando tarea:', err);
+                    } finally {
+                        loading.value = false;
+                    }
+                }
+
+                // Eliminar tarea
+                async function deleteTask(taskId) {
+                    if (loading.value) return;
+
+                    loading.value = true;
+                    error.value = null;
+
+                    try {
+                        console.log(`📤 Eliminando tarea ${taskId}...`);
+                        const response = await fetch(`${API_URL}/${taskId}`, {
+                            method: 'DELETE'
+                        });
+
+                        await handleFetch(response);
+                        
+                        // Eliminar la tarea de la lista local
+                        tasks.value = tasks.value.filter(task => task.id !== taskId);
+                        
+                        lastUpdate.value = new Date().toLocaleTimeString();
+                        console.log('✅ Tarea eliminada correctamente');
+                    } catch (err) {
+                        error.value = 'Error al eliminar la tarea: ' + err.message;
+                        console.error('❌ Error eliminando tarea:', err);
+                    } finally {
+                        loading.value = false;
+                    }
+                }
+
+                // Cargar tareas al montar el componente (onMounted)
+                onMounted(() => {
+                    console.log('🔄 Componente montado, cargando tareas iniciales...');
+                    loadTasks();
+                });
+
+                return {
+                    tasks,
+                    newTaskText,
+                    loading,
+                    error,
+                    lastUpdate,
+                    addTask,
+                    deleteTask
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+para ejecutar el programa de usan dos terminales 
+
+---primera terminal (para ejecutar el servidor de las apis)
+persistence-tasker/backend
+
+mpm run dev
+
+--- segunda terminal (para ejecutar el fronend)
+persistence-tasker/frontend
+
+live-server 
